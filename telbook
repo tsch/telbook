@@ -248,11 +248,18 @@ sub create_main_list_container {
     my ($column, $title, $width) = @{$_};
 
     my $cell_renderer = Gtk3::CellRendererText -> new();
+    $cell_renderer -> set(editable => Glib::TRUE);
+    $cell_renderer -> signal_connect(edited => sub {
+      my ($cell_renderer, $path, $new) = @_;
+      my $iterator = $model -> get_iter_from_string($path);
+      $self -> changed(1);
+      $model -> set($iterator, $column => $new);
+    });
+
     my $view_column =
       Gtk3::TreeViewColumn -> new_with_attributes($title,
                                                   $cell_renderer,
                                                   text => $column);
-
     $view_column -> set_min_width($width);
     $view_column -> set_sort_column_id($column);
 
