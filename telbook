@@ -413,7 +413,7 @@ sub filter_rows {
                             $model -> get($iterator, COLUMN_HOME),
                             $model -> get($iterator, COLUMN_MOBILE));
 
-      unless (index($value_name, $filter_name) > -1 &&
+      unless (index(lc($value_name), lc($filter_name)) > -1 &&
               index($value_home, $filter_home) > -1 &&
               index($value_mobile, $filter_mobile) > -1) {
         push(@{$self -> { main_model } -> { _hidden }}, [$value_name, $value_home, $value_mobile]);
