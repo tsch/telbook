@@ -1,0 +1,61 @@
+
+                       Telbook - A Simple Telephone Book
+                      -----------------------------------
+
+                                   +-------+
+                                   | Usage |
+                                   +-------+
+
+Telbook is a simple telephone book with which you can manage a list of persons
+and their home and mobile telephone numbers. Its purpose is not to provide you
+with a full-fletched address book but to be a simple yet convenient tool.
+
+You can add an entry by typing the name and that person's telephone numbers in
+the corresponding text entry fields and then hitting either [ENTER] or
+[KP_ENTER] or clicking the "Add" button.
+
+In the same place you can also modify existing entries: In the list, select the
+person you want to alter, make your changes, and click the "Replace" button to
+apply them. If you click the "Add" button, a new entry will be created
+alongside the old one. This is useful if, for example, you want to add a
+relative of a person already in your list.
+
+Existing entries can be deleted using the [DEL] key.
+
+The filter area enables you to incrementally search the list of
+persons. Whenever you change a criterion, the list is automatically reduced to
+the entries matching the given filters.
+
+With the "Open" button you can load telephone books (the default being
+"~/.telbook"). If there already are entries in the list, you will be asked upon
+opening whether you want to replace the current list or incorporate the new
+entries into it.
+
+The "Save" button saves the current list to the file associated with it,
+whereas "Save As" will ask you to provide a file name.
+
+Finally, "Quit" exits the program. If there are unsaved changes, you will be
+asked whether you really want to abandon them.
+
+There are no commandline arguments or a configuration file. If "~/.telbook"
+exists it will be read during startup.
+
+                               +--------------+
+                               | Requirements |
+                               +--------------+
+
+Telbook is written in Perl and uses the GTK+-Perl bindings. See
+
+  http://www.perl.com
+
+and
+
+  http://www.gtkperl.org/
+
+for installation instructions.
+
+                               +--------------+
+                               | Installation |
+                               +--------------+
+
+Copy 'telbook' wherever you like and make sure that place is in your $PATH.

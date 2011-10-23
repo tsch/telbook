@@ -1,0 +1,698 @@
+#!/usr/bin/perl -w
+
+###############################################################################
+#                                                                             #
+# Telbook - A simple telephone book                                           #
+# Copyright (C) 2003 Torsten Schönfeld                                        #
+#                                                                             #
+# This program is free software; you can redistribute it and/or modify it     #
+# under the terms of the GNU General Public License as published by the Free  #
+# Software Foundation; either version 2 of the License, or (at your option)   #
+# any later version.                                                          #
+#                                                                             #
+# This program is distributed in the hope that it will be useful, but WITHOUT #
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or       #
+# FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for   #
+# more details.                                                               #
+#                                                                             #
+# You should have received a copy of the GNU General Public License along     #
+# with this program; if not, write to the Free Software Foundation, Inc., 59  #
+# Temple Place, Suite 330, Boston, MA 02111-1307 USA                          #
+#                                                                             #
+###############################################################################
+
+use strict;
+use Gtk qw(-init);
+
+###############################################################################
+
+package ui;
+
+use constant {
+    ROW_NAME => 0,
+    ROW_HOME => 1,
+  ROW_MOBILE => 2
+};
+
+sub new {
+  my ($class) = @_;
+  my $self = {};
+
+  bless($self, $class);
+
+  $self -> changed(0);
+
+  return $self;
+}
+
+sub changed {
+  my ($self, $value) = @_;
+
+  if (defined($value)) {
+    if ($value == 1 && $self -> { _changed } != 1) {
+      $self -> { main_window } -> set_title($self -> { main_window } -> title() . " (*)");
+    }
+
+    $self -> { _changed } = $value;
+  }
+
+  return $self -> { _changed };
+}
+
+sub create_buttons {
+  my ($self) = @_;
+
+  $self -> { button_hbox } = Gtk::HBox -> new(0, 0);
+
+  $self -> { button_open } = Gtk::Button -> new("Open");
+  $self -> { button_save } = Gtk::Button -> new("Save");
+  $self -> { button_save_as } = Gtk::Button -> new("Save As");
+  $self -> { button_quit } = Gtk::Button -> new("Quit");
+
+  $self -> { button_open } -> signal_connect("clicked", sub {
+    return $self -> file_open();
+  });
+
+  $self -> { button_save } -> signal_connect("clicked", sub {
+    return $self -> file_save();
+  });
+
+  $self -> { button_save_as } -> signal_connect("clicked", sub {
+    return $self -> file_save_as();
+  });
+
+  $self -> { button_quit } -> signal_connect("clicked", sub {
+    return $self -> quit();
+  });
+
+  $self -> { button_hbox } -> pack_start($self -> { button_open }, 1, 1, 0);
+  $self -> { button_hbox } -> pack_start($self -> { button_save }, 1, 1, 0);
+  $self -> { button_hbox } -> pack_start($self -> { button_save_as }, 1, 1, 0);
+  $self -> { button_hbox } -> pack_start($self -> { button_quit }, 1, 1, 0);
+
+  return $self -> { button_hbox };
+}
+
+sub create_edit_frame {
+  my ($self) = @_;
+
+  $self -> { edit_frame } = Gtk::Frame -> new("Edit");
+  $self -> { edit_vbox } = Gtk::VBox -> new(0, 0);
+
+  $self -> { edit_vbox } -> set_border_width(5);
+
+  $self -> { edit_entry_hbox } = Gtk::HBox -> new(0, 0);
+  $self -> { edit_button_hbox } = Gtk::HBox -> new(0, 0);
+
+  $self -> { edit_entry_name } = Gtk::Entry -> new();
+  $self -> { edit_entry_home } = Gtk::Entry -> new();
+  $self -> { edit_entry_mobile } = Gtk::Entry -> new();
+
+  $self -> { button_add } = Gtk::Button -> new("Add");
+  $self -> { button_replace } = Gtk::Button -> new("Replace");
+
+  foreach (qw(edit_entry_name edit_entry_home edit_entry_mobile)) {
+    $self -> { $_ } -> signal_connect("key_press_event", sub {
+      my ($entry, $event) = @_;
+
+      #                           enter                            kp_enter
+      if ($event -> { keyval } == 65293 || $event -> { keyval } == 65421) {
+        $self -> { button_add } -> signal_emit_by_name("clicked");
+        $entry -> signal_emit_stop_by_name("key_press_event");
+
+        return 1;
+      }
+
+      return 0;
+    });
+  }
+
+  $self -> { button_add } -> signal_connect("clicked", sub {
+    my ($name,
+        $home,
+        $mobile) = ($self -> { edit_entry_name } -> get_text(),
+                    $self -> { edit_entry_home } -> get_text(),
+                    $self -> { edit_entry_mobile } -> get_text());
+
+    if ($name ne "") {
+      if ($self -> valid($name, $home, $mobile)) {
+        $self -> { main_clist } -> append($name, $home, $mobile);
+
+        $self -> changed(1);
+
+        $self -> { edit_entry_name } -> set_text("");
+        $self -> { edit_entry_home } -> set_text("");
+        $self -> { edit_entry_mobile } -> set_text("");
+
+        $self -> { edit_entry_name } -> grab_focus();
+      }
+      else {
+        $self -> error("Tab characters may not be used.");
+      }
+    }
+    else {
+      # Is this message really necessary?
+      $self -> error("The name field may not be empty.");
+    }
+
+    return 1;
+  });
+
+  $self -> { button_replace } -> signal_connect("clicked", sub {
+    my $selection = $self -> { main_clist } -> selection();
+
+    if (defined($selection)) {
+      my ($name,
+          $home,
+          $mobile) = ($self -> { edit_entry_name } -> get_text(),
+                      $self -> { edit_entry_home } -> get_text(),
+                      $self -> { edit_entry_mobile } -> get_text());
+
+      if ($name ne "") {
+        if ($self -> valid($name, $home, $mobile)) {
+          $self -> { main_clist } -> set_text($selection, ROW_NAME, $name);
+          $self -> { main_clist } -> set_text($selection, ROW_HOME, $home);
+          $self -> { main_clist } -> set_text($selection, ROW_MOBILE, $mobile);
+
+          $self -> changed(1);
+        }
+        else {
+          $self -> error("Tab characters may not be used.");
+        }
+      }
+      else {
+        # See above.
+        $self -> error("The name field may not be empty.");
+      }
+    }
+
+    return 1;
+  });
+
+  $self -> { edit_entry_hbox } -> pack_start($self -> { edit_entry_name }, 1, 1, 0);
+  $self -> { edit_entry_hbox } -> pack_start($self -> { edit_entry_home }, 1, 1, 0);
+  $self -> { edit_entry_hbox } -> pack_start($self -> { edit_entry_mobile }, 1, 1, 0);
+
+  $self -> { edit_button_hbox } -> pack_start($self -> { button_add }, 1, 1, 0);
+  $self -> { edit_button_hbox } -> pack_start($self -> { button_replace }, 1, 1, 0);
+
+  $self -> { edit_vbox } -> pack_start($self -> { edit_entry_hbox }, 1, 1, 0);
+  $self -> { edit_vbox } -> pack_start($self -> { edit_button_hbox }, 1, 1, 0);
+
+  $self -> { edit_frame } -> add($self -> { edit_vbox });
+
+  return $self -> { edit_frame };
+}
+
+sub create_filter_frame {
+  my ($self) = @_;
+
+  $self -> { filter_frame } = Gtk::Frame -> new("Filter");
+  $self -> { filter_vbox } = Gtk::VBox -> new(0, 0);
+
+  $self -> { filter_vbox } -> set_border_width(5);
+
+  $self -> { filter_entry_hbox } = Gtk::HBox -> new(0, 0);
+  $self -> { filter_button_hbox } = Gtk::HBox -> new(0, 0);
+
+  $self -> { filter_entry_name } = Gtk::Entry -> new();
+  $self -> { filter_entry_home } = Gtk::Entry -> new();
+  $self -> { filter_entry_mobile } = Gtk::Entry -> new();
+
+  $self -> { filter_entry_name } -> signal_connect("changed", sub {
+    return $self -> filter_rows();
+  });
+
+  $self -> { filter_entry_home } -> signal_connect("changed", sub {
+    return $self -> filter_rows();
+  });
+
+  $self -> { filter_entry_mobile } -> signal_connect("changed", sub {
+    return $self -> filter_rows();
+  });
+
+  $self -> { filter_entry_hbox } -> pack_start($self -> { filter_entry_name }, 1, 1, 0);
+  $self -> { filter_entry_hbox } -> pack_start($self -> { filter_entry_home }, 1, 1, 0);
+  $self -> { filter_entry_hbox } -> pack_start($self -> { filter_entry_mobile }, 1, 1, 0);
+
+  $self -> { filter_vbox } -> pack_start($self -> { filter_entry_hbox }, 1, 1, 0);
+  $self -> { filter_vbox } -> pack_start($self -> { filter_button_hbox }, 1, 1, 0);
+
+  $self -> { filter_frame } -> add($self -> { filter_vbox });
+
+  return $self -> { filter_frame };
+}
+
+sub create_main_clist_container {
+  my ($self) = @_;
+
+  $self -> { main_clist_container } = Gtk::ScrolledWindow -> new(0, 0);
+  $self -> { main_clist } = Gtk::CList -> new(3);
+
+  $self -> { main_clist } -> set_selection_mode("single");
+
+  $self -> { main_clist } -> set_column_width(0, 240);
+  $self -> { main_clist } -> set_column_width(1, 100);
+  $self -> { main_clist } -> set_column_width(2, 100);
+
+  $self -> set_column_titles($self -> { main_clist }, ROW_NAME, "down");
+
+  $self -> { main_clist } -> column_titles_show();
+
+  $self -> { main_clist } -> set_sort_column(ROW_NAME);
+  $self -> { main_clist } -> set_sort_type("ascending");
+  $self -> { main_clist } -> set_auto_sort(1);
+
+  $self -> { main_clist } -> signal_connect("select_row", sub {
+    my ($clist, $row, $column, $event) = @_;
+
+    $self -> { edit_entry_name } -> set_text($clist -> get_text($row, ROW_NAME));
+    $self -> { edit_entry_home } -> set_text($clist -> get_text($row, ROW_HOME));
+    $self -> { edit_entry_mobile } -> set_text($clist -> get_text($row, ROW_MOBILE));
+
+    return 1;
+  });
+
+  $self -> { main_clist } -> signal_connect("unselect_row", sub {
+    my ($clist, $row, $column, $event) = @_;
+
+    $self -> { edit_entry_name } -> set_text("");
+    $self -> { edit_entry_home } -> set_text("");
+    $self -> { edit_entry_mobile } -> set_text("");
+
+    return 1;
+  });
+
+  $self -> { main_clist } -> signal_connect("key_press_event", sub {
+    my ($clist, $event) = @_;
+
+    #                           delete
+    if ($event -> { keyval } == 65535) {
+      my $selection = $clist -> selection();
+
+      if (defined($selection)) {
+        $clist -> remove($selection);
+        $self -> changed(1);
+      }
+
+      return 1;
+    }
+
+    return 0;
+  });
+
+  $self -> { main_clist } -> signal_connect("click_column", sub {
+    my ($clist, $new_sort_column) = @_;
+    my $old_sort_column = $clist -> sort_column();
+
+    unless ($new_sort_column == $old_sort_column) {
+      $self -> set_column_titles($clist, $new_sort_column, "down");
+      $clist -> set_sort_column($new_sort_column);
+      $clist -> set_sort_type("ascending");
+    }
+    else {
+      if ($clist -> sort_type() eq "ascending") {
+        $self -> set_column_titles($clist, $new_sort_column, "up");
+        $clist -> set_sort_type("descending");
+      }
+      else {
+        $self -> set_column_titles($clist, $new_sort_column, "down");
+        $clist -> set_sort_type("ascending");
+      }
+    }
+
+    $clist -> sort();
+
+    return 1;
+  });
+
+  $self -> { main_clist_container } -> add($self -> { main_clist });
+  $self -> { main_clist_container } -> set_policy("automatic", "automatic");
+
+  return $self -> { main_clist_container };
+}
+
+sub create_main_window {
+  my ($self) = @_;
+
+  $self -> { main_window } = Gtk::Window -> new();
+  $self -> { main_vbox } = Gtk::VBox -> new(0, 5);
+
+  $self -> { main_window } -> set_title("Telephone Book");
+  $self -> { main_window } -> set_usize(500, 300);
+  $self -> { main_window } -> set_border_width(5);
+
+  $self -> { main_window } -> signal_connect("delete_event", sub {
+    return $self -> quit();
+  });
+
+  $self -> { main_vbox } -> pack_start($self -> create_edit_frame(), 0, 0, 0);
+  $self -> { main_vbox } -> pack_start($self -> create_filter_frame(), 0, 0, 0);
+  $self -> { main_vbox } -> pack_start($self -> create_main_clist_container(), 1, 1, 0);
+  $self -> { main_vbox } -> pack_start($self -> create_buttons(), 0, 0, 0);
+
+  $self -> { main_window } -> add($self -> { main_vbox });
+  $self -> { main_window } -> show_all();
+
+  return 1;
+}
+
+sub error {
+  my ($self, $label) = @_;
+
+  my $dialog = Gtk::Dialog -> new();
+
+  $dialog -> signal_connect("delete_event", sub {
+    Gtk -> main_quit();
+    return 1;
+  });
+
+  my $message = Gtk::Label -> new("\n  $label  \n");
+  my $ok_button = Gtk::Button -> new("Ok");
+
+  $ok_button -> signal_connect("clicked", sub {
+    Gtk -> main_quit();
+    return 1;
+  });
+
+  $dialog -> vbox -> pack_start($message, 1, 1, 0);
+  $dialog -> action_area -> pack_start($ok_button, 1, 1, 0);
+
+  $dialog -> set_title("");
+  $dialog -> set_border_width(5);
+  $dialog -> set_modal(1);
+  $dialog -> set_transient_for($self -> { main_window });
+  $dialog -> show_all();
+
+  Gtk -> main();
+  $dialog -> destroy();
+
+  return 1;
+}
+
+sub file {
+  my ($self, $file) = @_;
+
+  if (defined($file)) {
+    $self -> { _file } = $file;
+  }
+
+  return $self -> { _file };
+}
+
+sub initialize {
+  my ($self) = @_;
+
+  $self -> create_main_window();
+
+  return 1;
+}
+
+sub filter_rows {
+  my ($self) = @_;
+
+  my ($filter_name,
+      $filter_home,
+      $filter_mobile) = ($self -> { filter_entry_name } -> get_text(),
+                         $self -> { filter_entry_home } -> get_text(),
+                         $self -> { filter_entry_mobile } -> get_text());
+
+  my $red = Gtk::Gdk::Color -> parse_color("red");
+  my $black = Gtk::Gdk::Color -> parse_color("black");
+
+  $self -> { main_clist } -> freeze();
+
+  foreach (@{$self -> { _hidden_rows }}) {
+    $self -> { main_clist } -> append(@{$_});
+  }
+
+  $self -> { _hidden_rows } = [];
+
+  if ($filter_name ne "" || $filter_home ne "" || $filter_mobile ne "") {
+    my $offset = 0;
+
+    foreach (0 .. ($self -> { main_clist } -> rows() - 1)) {
+      my ($value_name,
+          $value_home,
+          $value_mobile) = ($self -> { main_clist } -> get_text($_ - $offset, ROW_NAME),
+                            $self -> { main_clist } -> get_text($_ - $offset, ROW_HOME),
+                            $self -> { main_clist } -> get_text($_ - $offset, ROW_MOBILE));
+
+      unless (index($value_name, $filter_name) > -1 &&
+              index($value_home, $filter_home) > -1 &&
+              index($value_mobile, $filter_mobile) > -1) {
+        push(@{$self -> { _hidden_rows }}, [$value_name, $value_home, $value_mobile]);
+        $self -> { main_clist } -> remove($_ - $offset);
+
+        $offset++;
+      }
+    }
+  }
+
+  $self -> { main_clist } -> thaw();
+
+  return 1;
+}
+
+sub file_dialog {
+  my ($self, $action) = @_;
+
+  my $file;
+
+  my $file_selector = Gtk::FileSelection -> new(
+    ($action eq "save") ?
+      "Select a file for saving" :
+      "Select the file to open");
+
+  $file_selector -> signal_connect("delete_event", sub {
+    Gtk -> main_quit();
+    return 1;
+  });
+
+  $file_selector -> ok_button -> signal_connect("clicked", sub {
+    $file = $file_selector -> get_filename();
+    Gtk -> main_quit();
+    return 1;
+  });
+
+  $file_selector -> cancel_button -> signal_connect("clicked", sub {
+    Gtk -> main_quit();
+    return 1;
+  });
+
+  $file_selector -> set_modal(1);
+  $file_selector -> set_transient_for($self -> { main_window });
+  $file_selector -> show_all();
+
+  Gtk -> main();
+  $file_selector -> destroy();
+
+  return $file;
+}
+
+sub file_open {
+  my ($self, $file) = @_;
+
+  unless (defined($file)) {
+    $file = $self -> file_dialog("open");
+  }
+
+  if (defined($file)) {
+    $self -> changed(0);
+    $self -> file($file);
+    $self -> { main_window } -> set_title("Telephone Book - $file");
+
+    if ($self -> { main_clist } -> rows() > 0) {
+      if ($self -> question("Do you want to clear the list before inserting the new entries?")) {
+        $self -> { main_clist } -> clear();
+      }
+      else {
+        $self -> changed(1);
+      }
+    }
+
+    open(FILE, $file) or return $self -> error("Error opening $file: $!");
+
+    while (<FILE>) {
+      chomp();
+
+      my ($name, $home, $mobile) = split(/\t/);
+
+      if (defined($name) && $name ne "") {
+        $self -> { main_clist } -> append($name, $home, $mobile);
+      }
+    }
+
+    close(FILE);
+  }
+
+  return 1;
+}
+
+sub file_save {
+  my ($self, $file) = @_;
+
+  unless (defined($file)) {
+    $file = $self -> file();
+  }
+
+  if (defined($file)) {
+    $self -> { filter_entry_name } -> set_text("");
+    $self -> { filter_entry_home } -> set_text("");
+    $self -> { filter_entry_mobile } -> set_text("");
+
+    $self -> filter_rows();
+
+    open(FILE, ">" . $file) or return $self -> error("Error opening $file: $!");
+
+    foreach (0 .. ($self -> { main_clist } -> rows() - 1)) {
+      print FILE join("\t", ($self -> { main_clist } -> get_text($_, ROW_NAME),
+                             $self -> { main_clist } -> get_text($_, ROW_HOME),
+                             $self -> { main_clist } -> get_text($_, ROW_MOBILE))), "\n";
+    }
+
+    close(FILE);
+
+    $self -> changed(0);
+    $self -> file($file);
+    $self -> { main_window } -> set_title("Telephone Book - $file");
+  }
+  else {
+    $self -> error("No file specified.");
+  }
+
+  return 1;
+}
+
+sub file_save_as {
+  my ($self) = @_;
+  my $file = $self -> file_dialog("save");
+
+  $self -> file_save($file) if (defined($file));
+
+  return 1;
+}
+
+sub question {
+  my ($self, $label) = @_;
+
+  my $dialog = Gtk::Dialog -> new();
+
+  $dialog -> signal_connect("delete_event", sub {
+    Gtk -> main_quit();
+    return 1;
+  });
+
+  my $return = 0;
+
+  my $message = Gtk::Label -> new("\n  $label  \n");
+
+  my $yes_button = Gtk::Button -> new("Yes");
+  my $no_button = Gtk::Button -> new("No");
+
+  $yes_button -> signal_connect("clicked", sub {
+    $return = 1;
+    Gtk -> main_quit();
+    return 1;
+  });
+
+  $no_button -> signal_connect("clicked", sub {
+    Gtk -> main_quit();
+    return 1;
+  });
+
+  $dialog -> vbox -> pack_start($message, 1, 1, 0);
+  $dialog -> action_area -> pack_start($yes_button, 1, 1, 0);
+  $dialog -> action_area -> pack_start($no_button, 1, 1, 0);
+
+  $dialog -> set_title("");
+  $dialog -> set_border_width(5);
+  $dialog -> set_modal(1);
+  $dialog -> set_transient_for($self -> { main_window });
+  $dialog -> show_all();
+
+  Gtk -> main();
+  $dialog -> destroy();
+
+  return $return;
+}
+
+sub quit {
+  my ($self) = @_;
+
+  if ($self -> changed() == 1) {
+    if ($self -> question("Really quit and abandon all changes?")) {
+      Gtk -> main_quit();
+    }
+  }
+  else {
+    Gtk -> main_quit();
+  }
+
+  return 1;
+}
+
+sub run {
+  my ($self) = @_;
+
+  Gtk -> main();
+
+  return 1;
+}
+
+sub set_column_title {
+  my ($self, $clist, $column, $title, $arrow_direction) = @_;
+
+  my $hbox = Gtk::HBox -> new(0, 0);
+  my $label = Gtk::Label -> new($title);
+
+  $hbox -> pack_start($label, 0, 0, 0);
+
+  if (defined($arrow_direction)) {
+    my $arrow = Gtk::Arrow -> new($arrow_direction, "none");
+    $hbox -> pack_end($arrow, 0, 0, 3);
+  }
+
+  $hbox -> show_all();
+  $clist -> set_column_widget($column, $hbox);
+
+  return 1;
+}
+
+sub set_column_titles {
+  my ($self, $clist, $active_column, $direction) = @_;
+
+  foreach ([ROW_NAME, "Name"], [ROW_HOME, "Home"], [ROW_MOBILE, "Mobile"]) {
+    my ($column, $title) = @{$_};
+    $self -> set_column_title($clist,
+                              $column,
+                              $title,
+                              $column == $active_column ? $direction : undef);
+  }
+
+  return 1;
+}
+
+sub valid {
+  my ($self, @values) = @_;
+
+  foreach (@values) {
+    return 0 if (m/\t/);
+  }
+
+  return 1;
+}
+
+###############################################################################
+
+package main;
+
+my $ui = ui -> new();
+
+$ui -> initialize();
+
+if (-f $ENV{ HOME } . "/.telbook") {
+  $ui -> file_open($ENV{ HOME } . "/.telbook");
+}
+
+$ui -> run();
