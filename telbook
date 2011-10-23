@@ -213,14 +213,16 @@ sub create_edit_frame {
 sub create_filter_frame {
   my ($self) = @_;
 
-  my $filter_hbox = Gtk3::HBox -> new(0, 10);
-
-  my $filter_label = Gtk3::Label -> new('Filter:');
+  my $filter_hbox = Gtk3::HBox -> new(0, 5);
+  $filter_hbox -> set_border_width(5);
 
   my $filter_entry = Gtk3::Entry -> new();
   $filter_entry -> signal_connect(changed => sub {
     return $self -> filter_rows();
   });
+
+  my $filter_label = Gtk3::Label -> new_with_mnemonic('_Filter:');
+  $filter_label -> set_mnemonic_widget($filter_entry);
 
   $filter_hbox -> pack_start($filter_label, 0, 0, 0);
   $filter_hbox -> pack_start($filter_entry, 1, 1, 0);
