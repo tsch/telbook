@@ -98,116 +98,44 @@ sub create_buttons {
 sub create_edit_frame {
   my ($self) = @_;
 
-  my $edit_frame = Gtk3::Frame -> new("Edit");
-  my $edit_vbox = Gtk3::VBox -> new(0, 0);
-
-  $edit_vbox -> set_border_width(5);
-
-  my $edit_entry_hbox = Gtk3::HBox -> new(0, 0);
   my $edit_button_hbox = Gtk3::HBox -> new(0, 0);
 
-  my $edit_entry_name = Gtk3::Entry -> new();
-  my $edit_entry_home = Gtk3::Entry -> new();
-  my $edit_entry_mobile = Gtk3::Entry -> new();
-
   my $button_add = Gtk3::Button -> new("_Add");
-  my $button_replace = Gtk3::Button -> new("_Replace");
-
-  foreach ($edit_entry_name, $edit_entry_home, $edit_entry_mobile) {
-    $_ -> signal_connect(activate => sub {
-      $self -> { main_view } -> get_selection() -> get_selected() ?
-        $button_replace -> clicked() :
-        $button_add -> clicked();
-    });
-  }
+  my $button_remove = Gtk3::Button -> new("_Remove");
+  $button_remove -> set_sensitive(Glib::FALSE);
 
   $button_add -> signal_connect(clicked => sub {
-    my ($name,
-        $home,
-        $mobile) = ($edit_entry_name -> get_text(),
-                    $edit_entry_home -> get_text(),
-                    $edit_entry_mobile -> get_text());
-
-    if ($name ne "") {
-      if ($self -> valid($name, $home, $mobile)) {
-        $self -> { main_model } -> set(
-          $self -> { main_model } -> append(),
-          COLUMN_NAME, $name,
-          COLUMN_HOME, $home || "",
-          COLUMN_MOBILE, $mobile || "");
-
-        $self -> changed(1);
-
-        $edit_entry_name -> set_text("");
-        $edit_entry_home -> set_text("");
-        $edit_entry_mobile -> set_text("");
-
-        $edit_entry_name -> grab_focus();
-      }
-      else {
-        $self -> error("Tab characters may not be used.");
-      }
-    }
-    else {
-      # Is this message really necessary?
-      $self -> error("The name field may not be empty.");
-    }
-
+    # FIXME: This doesn't work quite right when a filter is active.
+    my $view = $self -> { main_view };
+    my $model = $self -> { main_model };
+    my $iterator = $model -> append();
+    $model -> set($iterator, COLUMN_VISIBLE, Glib::TRUE);
+    $self -> changed(1);
+    $view -> set_cursor($model -> get_path($iterator),
+                        $view -> get_column(COLUMN_NAME),
+                        Glib::TRUE);
     return 1;
   });
 
-  $button_replace -> signal_connect(clicked => sub {
-    my ($model, $iterator) = $self -> { main_view } -> get_selection() -> get_selected();
+  $button_remove -> signal_connect(clicked => sub {
+   my ($model, $iterator) = $self -> { main_view } -> get_selection() -> get_selected();
 
-    if (defined($model) && defined($iterator)) {
-      my ($name,
-          $home,
-          $mobile) = ($edit_entry_name -> get_text(),
-                      $edit_entry_home -> get_text(),
-                      $edit_entry_mobile -> get_text());
+   if (defined($model) && defined($iterator)) {
+     my $child_model = $model -> get_model();
+     my $child_iterator = $model -> convert_iter_to_child_iter($iterator);
+     $child_model -> remove($child_iterator);
+     $self -> changed(1);
+   }
 
-      if ($name ne "") {
-        if ($self -> valid($name, $home, $mobile)) {
-          my $child_iterator =
-            $self -> { main_filtered_model } -> convert_iter_to_child_iter($iterator);
-          $self -> { main_model } -> set(
-            $child_iterator,
-            COLUMN_NAME, $name,
-            COLUMN_HOME, $home || "",
-            COLUMN_MOBILE, $mobile || "");
-
-          $self -> changed(1);
-        }
-        else {
-          $self -> error("Tab characters may not be used.");
-        }
-      }
-      else {
-        # See above.
-        $self -> error("The name field may not be empty.");
-      }
-    }
-
-    return 1;
+   return 1;
   });
-
-  $edit_entry_hbox -> pack_start($edit_entry_name, 1, 1, 0);
-  $edit_entry_hbox -> pack_start($edit_entry_home, 1, 1, 0);
-  $edit_entry_hbox -> pack_start($edit_entry_mobile, 1, 1, 0);
 
   $edit_button_hbox -> pack_start($button_add, 1, 1, 0);
-  $edit_button_hbox -> pack_start($button_replace, 1, 1, 0);
+  $edit_button_hbox -> pack_start($button_remove, 1, 1, 0);
 
-  $edit_vbox -> pack_start($edit_entry_hbox, 1, 1, 0);
-  $edit_vbox -> pack_start($edit_button_hbox, 1, 1, 0);
+  $self -> { edit_button_remove } = $button_remove;
 
-  $edit_frame -> add($edit_vbox);
-
-  $self -> { edit_entry_name } = $edit_entry_name;
-  $self -> { edit_entry_home } = $edit_entry_home;
-  $self -> { edit_entry_mobile } = $edit_entry_mobile;
-
-  return $edit_frame;
+  return $edit_button_hbox;
 }
 
 sub create_filter_frame {
@@ -275,16 +203,8 @@ sub create_main_list_container {
     my ($selection) = @_;
     my ($model, $iterator) = $selection -> get_selected();
 
-    if (defined($model) && defined($iterator)) {
-      $self -> { edit_entry_name } -> set_text($model -> get($iterator, COLUMN_NAME));
-      $self -> { edit_entry_home } -> set_text($model -> get($iterator, COLUMN_HOME));
-      $self -> { edit_entry_mobile } -> set_text($model -> get($iterator, COLUMN_MOBILE));
-    }
-    else {
-      $self -> { edit_entry_name } -> set_text("");
-      $self -> { edit_entry_home } -> set_text("");
-      $self -> { edit_entry_mobile } -> set_text("");
-    }
+    my $have_selection = defined($model) && defined($iterator);
+    $self -> { edit_button_remove } -> set_sensitive ($have_selection);
 
     return 1;
   });
@@ -333,9 +253,9 @@ sub create_main_window {
     return $self -> quit();
   });
 
-  $main_vbox -> pack_start($self -> create_edit_frame(), 0, 0, 0);
   $main_vbox -> pack_start($self -> create_filter_frame(), 0, 0, 0);
   $main_vbox -> pack_start($self -> create_main_list_container(), 1, 1, 0);
+  $main_vbox -> pack_start($self -> create_edit_frame(), 0, 0, 0);
   $main_vbox -> pack_start($self -> create_buttons(), 0, 0, 0);
 
   $self -> { filter_entry } -> grab_focus();
