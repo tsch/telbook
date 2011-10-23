@@ -25,8 +25,7 @@ use strict;
 use warnings;
 use utf8;
 
-use Gtk2 1.02 -init;
-use Gtk2::Gdk::Keysyms;
+use Gtk3 -init;
 
 ###############################################################################
 
@@ -64,12 +63,12 @@ sub changed {
 sub create_buttons {
   my ($self) = @_;
 
-  my $button_hbox = Gtk2::HBox -> new(0, 0);
+  my $button_hbox = Gtk3::HBox -> new(0, 0);
 
-  my $button_open = Gtk2::Button -> new("_Open");
-  my $button_save = Gtk2::Button -> new("_Save");
-  my $button_save_as = Gtk2::Button -> new("Save _As");
-  my $button_quit = Gtk2::Button -> new("_Quit");
+  my $button_open = Gtk3::Button -> new("_Open");
+  my $button_save = Gtk3::Button -> new("_Save");
+  my $button_save_as = Gtk3::Button -> new("Save _As");
+  my $button_quit = Gtk3::Button -> new("_Quit");
 
   $button_open -> signal_connect("clicked", sub {
     return $self -> file_open();
@@ -98,20 +97,20 @@ sub create_buttons {
 sub create_edit_frame {
   my ($self) = @_;
 
-  my $edit_frame = Gtk2::Frame -> new("Edit");
-  my $edit_vbox = Gtk2::VBox -> new(0, 0);
+  my $edit_frame = Gtk3::Frame -> new("Edit");
+  my $edit_vbox = Gtk3::VBox -> new(0, 0);
 
   $edit_vbox -> set_border_width(5);
 
-  my $edit_entry_hbox = Gtk2::HBox -> new(0, 0);
-  my $edit_button_hbox = Gtk2::HBox -> new(0, 0);
+  my $edit_entry_hbox = Gtk3::HBox -> new(0, 0);
+  my $edit_button_hbox = Gtk3::HBox -> new(0, 0);
 
-  my $edit_entry_name = Gtk2::Entry -> new();
-  my $edit_entry_home = Gtk2::Entry -> new();
-  my $edit_entry_mobile = Gtk2::Entry -> new();
+  my $edit_entry_name = Gtk3::Entry -> new();
+  my $edit_entry_home = Gtk3::Entry -> new();
+  my $edit_entry_mobile = Gtk3::Entry -> new();
 
-  my $button_add = Gtk2::Button -> new("_Add");
-  my $button_replace = Gtk2::Button -> new("_Replace");
+  my $button_add = Gtk3::Button -> new("_Add");
+  my $button_replace = Gtk3::Button -> new("_Replace");
 
   foreach ($edit_entry_name, $edit_entry_home, $edit_entry_mobile) {
     $_ -> signal_connect(activate => sub {
@@ -211,17 +210,17 @@ sub create_edit_frame {
 sub create_filter_frame {
   my ($self) = @_;
 
-  my $filter_frame = Gtk2::Frame -> new("Filter");
-  my $filter_vbox = Gtk2::VBox -> new(0, 0);
+  my $filter_frame = Gtk3::Frame -> new("Filter");
+  my $filter_vbox = Gtk3::VBox -> new(0, 0);
 
   $filter_vbox -> set_border_width(5);
 
-  my $filter_entry_hbox = Gtk2::HBox -> new(0, 0);
-  my $filter_button_hbox = Gtk2::HBox -> new(0, 0);
+  my $filter_entry_hbox = Gtk3::HBox -> new(0, 0);
+  my $filter_button_hbox = Gtk3::HBox -> new(0, 0);
 
-  my $filter_entry_name = Gtk2::Entry -> new();
-  my $filter_entry_home = Gtk2::Entry -> new();
-  my $filter_entry_mobile = Gtk2::Entry -> new();
+  my $filter_entry_name = Gtk3::Entry -> new();
+  my $filter_entry_home = Gtk3::Entry -> new();
+  my $filter_entry_mobile = Gtk3::Entry -> new();
 
   $filter_entry_name -> signal_connect(changed => sub {
     return $self -> filter_rows();
@@ -254,18 +253,18 @@ sub create_filter_frame {
 sub create_main_list_container {
   my ($self) = @_;
 
-  my $container = Gtk2::ScrolledWindow -> new();
-  my $model = Gtk2::ListStore -> new(qw(Glib::String Glib::String Glib::String));
-  my $view = Gtk2::TreeView -> new($model);
+  my $container = Gtk3::ScrolledWindow -> new();
+  my $model = Gtk3::ListStore -> new(qw(Glib::String Glib::String Glib::String));
+  my $view = Gtk3::TreeView -> new($model);
 
   foreach ([COLUMN_NAME, "Name", 240],
            [COLUMN_HOME, "Home", 100],
            [COLUMN_MOBILE, "Mobile", 100]) {
     my ($column, $title, $width) = @{$_};
 
-    my $cell_renderer = Gtk2::CellRendererText -> new();
+    my $cell_renderer = Gtk3::CellRendererText -> new();
     my $view_column =
-      Gtk2::TreeViewColumn -> new_with_attributes($title,
+      Gtk3::TreeViewColumn -> new_with_attributes($title,
                                                   $cell_renderer,
                                                   text => $column);
 
@@ -301,7 +300,8 @@ sub create_main_list_container {
   $view -> signal_connect(key_press_event => sub {
     my ($view, $event) = @_;
 
-    if ($event -> keyval == $Gtk2::Gdk::Keysyms{ Delete }) {
+    # FIXME3: $event->keyval?
+    if ($event -> key -> {keyval} == Gtk3::Gdk::KEY_Delete) {
       my $iterator = $view -> get_selection() -> get_selected();
 
       if (defined($iterator)) {
@@ -327,8 +327,8 @@ sub create_main_list_container {
 sub create_main_window {
   my ($self) = @_;
 
-  my $main_window = Gtk2::Window -> new("toplevel");
-  my $main_vbox = Gtk2::VBox -> new(0, 5);
+  my $main_window = Gtk3::Window -> new("toplevel");
+  my $main_vbox = Gtk3::VBox -> new(0, 5);
 
   $main_window -> set_title("Telephone Book");
   $main_window -> set_default_size(500, 600);
@@ -356,7 +356,7 @@ sub create_main_window {
 sub error {
   my ($self, $label) = @_;
 
-  my $dialog = Gtk2::MessageDialog -> new($self -> { main_window },
+  my $dialog = Gtk3::MessageDialog -> new($self -> { main_window },
                                           [qw(modal destroy_with_parent)],
                                           "error",
                                           "close",
@@ -437,24 +437,24 @@ sub file_dialog {
   my ($self, $action) = @_;
   my $file;
 
-  my $file_selector = Gtk2::FileSelection -> new(
+  my $file_selector = Gtk3::FileSelection -> new(
     ($action eq "save") ?
       "Select a file for saving" :
       "Select the file to open");
 
   $file_selector -> signal_connect(delete_event => sub {
-    Gtk2 -> main_quit();
+    Gtk3 -> main_quit();
     return 1;
   });
 
   $file_selector -> ok_button -> signal_connect(clicked => sub {
     $file = $file_selector -> get_filename();
-    Gtk2 -> main_quit();
+    Gtk3 -> main_quit();
     return 1;
   });
 
   $file_selector -> cancel_button -> signal_connect(clicked => sub {
-    Gtk2 -> main_quit();
+    Gtk3 -> main_quit();
     return 1;
   });
 
@@ -462,7 +462,7 @@ sub file_dialog {
   $file_selector -> set_transient_for($self -> { main_window });
   $file_selector -> show_all();
 
-  Gtk2 -> main();
+  Gtk3 -> main();
   $file_selector -> destroy();
 
   return $file;
@@ -562,7 +562,7 @@ sub file_save_as {
 sub question {
   my ($self, $label) = @_;
 
-  my $dialog = Gtk2::MessageDialog -> new($self -> { main_window },
+  my $dialog = Gtk3::MessageDialog -> new($self -> { main_window },
                                           [qw(modal destroy_with_parent)],
                                           "question",
                                           "yes_no",
@@ -571,7 +571,8 @@ sub question {
   my $response = $dialog -> run();
   $dialog -> destroy();
 
-  return $response eq "yes" ? 1 : 0;
+  # FIXME3: return $response eq "yes" ? 1 : 0;
+  return $response == -8 ? 1 : 0;
 }
 
 sub quit {
@@ -579,11 +580,11 @@ sub quit {
 
   if ($self -> changed() == 1) {
     if ($self -> question("Really quit and abandon all changes?")) {
-      Gtk2 -> main_quit();
+      Gtk3 -> main_quit();
     }
   }
   else {
-    Gtk2 -> main_quit();
+    Gtk3 -> main_quit();
   }
 
   return 1;
@@ -592,7 +593,7 @@ sub quit {
 sub run {
   my ($self) = @_;
 
-  Gtk2 -> main();
+  Gtk3 -> main();
 
   return 1;
 }
