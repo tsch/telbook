@@ -221,34 +221,20 @@ sub create_filter_frame {
   my $filter_entry_hbox = Gtk3::HBox -> new(0, 0);
   my $filter_button_hbox = Gtk3::HBox -> new(0, 0);
 
-  my $filter_entry_name = Gtk3::Entry -> new();
-  my $filter_entry_home = Gtk3::Entry -> new();
-  my $filter_entry_mobile = Gtk3::Entry -> new();
+  my $filter_entry = Gtk3::Entry -> new();
 
-  $filter_entry_name -> signal_connect(changed => sub {
+  $filter_entry -> signal_connect(changed => sub {
     return $self -> filter_rows();
   });
 
-  $filter_entry_home -> signal_connect(changed => sub {
-    return $self -> filter_rows();
-  });
-
-  $filter_entry_mobile -> signal_connect(changed => sub {
-    return $self -> filter_rows();
-  });
-
-  $filter_entry_hbox -> pack_start($filter_entry_name, 1, 1, 0);
-  $filter_entry_hbox -> pack_start($filter_entry_home, 1, 1, 0);
-  $filter_entry_hbox -> pack_start($filter_entry_mobile, 1, 1, 0);
+  $filter_entry_hbox -> pack_start($filter_entry, 1, 1, 0);
 
   $filter_vbox -> pack_start($filter_entry_hbox, 1, 1, 0);
   $filter_vbox -> pack_start($filter_button_hbox, 1, 1, 0);
 
   $filter_frame -> add($filter_vbox);
 
-  $self -> { filter_entry_name } = $filter_entry_name;
-  $self -> { filter_entry_home } = $filter_entry_home;
-  $self -> { filter_entry_mobile } = $filter_entry_mobile;
+  $self -> { filter_entry } = $filter_entry;
 
   return $filter_frame;
 }
@@ -352,7 +338,7 @@ sub create_main_window {
   $main_vbox -> pack_start($self -> create_main_list_container(), 1, 1, 0);
   $main_vbox -> pack_start($self -> create_buttons(), 0, 0, 0);
 
-  $self -> { filter_entry_name } -> grab_focus();
+  $self -> { filter_entry } -> grab_focus();
 
   $main_window -> add($main_vbox);
   $main_window -> show_all();
@@ -398,11 +384,7 @@ sub initialize {
 sub filter_rows {
   my ($self) = @_;
 
-  my ($filter_name,
-      $filter_home,
-      $filter_mobile) = ($self -> { filter_entry_name } -> get_text(),
-                         $self -> { filter_entry_home } -> get_text(),
-                         $self -> { filter_entry_mobile } -> get_text());
+  my $filter_text = $self -> { filter_entry } -> get_text();
 
   $self -> { main_model } -> foreach(sub {
     my ($model, $path, $iterator) = @_;
@@ -413,10 +395,10 @@ sub filter_rows {
                           $model -> get($iterator, COLUMN_MOBILE));
 
     my $matches = Glib::TRUE;
-    if ($filter_name ne "" || $filter_home ne "" || $filter_mobile ne "") {
-      $matches = index(lc($value_name), lc($filter_name)) > -1 &&
-                 index($value_home, $filter_home) > -1 &&
-                 index($value_mobile, $filter_mobile) > -1;
+    if ($filter_text ne "") {
+      $matches = index(lc($value_name), lc($filter_text)) > -1 ||
+                 index($value_home, $filter_text) > -1 ||
+                 index($value_mobile, $filter_text) > -1;
     }
     $model -> set($iterator, COLUMN_VISIBLE, $matches);
 
