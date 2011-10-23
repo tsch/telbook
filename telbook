@@ -25,7 +25,7 @@ use strict;
 use warnings;
 use utf8;
 
-use Gtk3 -init;
+use Gtk3 0.001 -init; # FIXME: 0.002
 
 ###############################################################################
 
@@ -34,6 +34,7 @@ package ui;
 use constant COLUMN_NAME => 0;
 use constant COLUMN_HOME => 1;
 use constant COLUMN_MOBILE => 2;
+use constant COLUMN_VISIBLE => 3;
 
 sub new {
   my ($class) = @_;
@@ -167,8 +168,10 @@ sub create_edit_frame {
 
       if ($name ne "") {
         if ($self -> valid($name, $home, $mobile)) {
+          my $child_iterator =
+            $self -> { main_filtered_model } -> convert_iter_to_child_iter($iterator);
           $self -> { main_model } -> set(
-            $iterator,
+            $child_iterator,
             COLUMN_NAME, $name,
             COLUMN_HOME, $home || "",
             COLUMN_MOBILE, $mobile || "");
@@ -254,8 +257,11 @@ sub create_main_list_container {
   my ($self) = @_;
 
   my $container = Gtk3::ScrolledWindow -> new();
-  my $model = Gtk3::ListStore -> new(qw(Glib::String Glib::String Glib::String));
-  my $view = Gtk3::TreeView -> new($model);
+  my $model = Gtk3::ListStore -> new(qw(Glib::String Glib::String Glib::String
+                                        Glib::Boolean));
+  my $filtered_model = Gtk3::TreeModelFilter -> new($model, undef);
+  $filtered_model -> set_visible_column(COLUMN_VISIBLE);
+  my $view = Gtk3::TreeView -> new($filtered_model);
 
   foreach ([COLUMN_NAME, "Name", 240],
            [COLUMN_HOME, "Home", 100],
@@ -305,7 +311,9 @@ sub create_main_list_container {
       my $iterator = $view -> get_selection() -> get_selected();
 
       if (defined($iterator)) {
-        $model -> remove($iterator);
+        my $child_iterator =
+          $filtered_model -> convert_iter_to_child_iter($iterator);
+        $model -> remove($child_iterator);
         $self -> changed(1);
       }
 
@@ -319,6 +327,7 @@ sub create_main_list_container {
   $container -> set_policy("automatic", "automatic");
 
   $self -> { main_model } = $model;
+  $self -> { main_filtered_model } = $filtered_model;
   $self -> { main_view } = $view;
 
   return $container;
@@ -395,40 +404,24 @@ sub filter_rows {
                          $self -> { filter_entry_home } -> get_text(),
                          $self -> { filter_entry_mobile } -> get_text());
 
-  foreach (@{$self -> { main_model } -> { _hidden }}) {
-    $self -> { main_model } -> set(
-      $self -> { main_model } -> append(),
-      COLUMN_NAME, $_ -> [0],
-      COLUMN_HOME, $_ -> [1] || "",
-      COLUMN_MOBILE, $_ -> [2] || "");
-  }
+  $self -> { main_model } -> foreach(sub {
+    my ($model, $path, $iterator) = @_;
+    my ($value_name,
+        $value_home,
+        $value_mobile) = ($model -> get($iterator, COLUMN_NAME),
+                          $model -> get($iterator, COLUMN_HOME),
+                          $model -> get($iterator, COLUMN_MOBILE));
 
-  $self -> { main_model } -> { _hidden } = [];
-  my @victims = ();
-
-  if ($filter_name ne "" || $filter_home ne "" || $filter_mobile ne "") {
-    $self -> { main_model } -> foreach(sub {
-      my ($model, $path, $iterator) = @_;
-      my ($value_name,
-          $value_home,
-          $value_mobile) = ($model -> get($iterator, COLUMN_NAME),
-                            $model -> get($iterator, COLUMN_HOME),
-                            $model -> get($iterator, COLUMN_MOBILE));
-
-      unless (index(lc($value_name), lc($filter_name)) > -1 &&
-              index($value_home, $filter_home) > -1 &&
-              index($value_mobile, $filter_mobile) > -1) {
-        push(@{$self -> { main_model } -> { _hidden }}, [$value_name, $value_home, $value_mobile]);
-        push(@victims, $iterator -> copy());
-      }
-
-      return 0;
-    });
-
-    foreach (@victims) {
-      $self -> { main_model } -> remove($_);
+    my $matches = Glib::TRUE;
+    if ($filter_name ne "" || $filter_home ne "" || $filter_mobile ne "") {
+      $matches = index(lc($value_name), lc($filter_name)) > -1 &&
+                 index($value_home, $filter_home) > -1 &&
+                 index($value_mobile, $filter_mobile) > -1;
     }
-  }
+    $model -> set($iterator, COLUMN_VISIBLE, $matches);
+
+    return 0;
+  });
 
   return 1;
 }
@@ -501,7 +494,8 @@ sub file_open {
           $self -> { main_model } -> append(),
           COLUMN_NAME, $name,
           COLUMN_HOME, $home || "",
-          COLUMN_MOBILE, $mobile || "");
+          COLUMN_MOBILE, $mobile || "",
+          COLUMN_VISIBLE, Glib::TRUE);
       }
     }
 
@@ -519,12 +513,6 @@ sub file_save {
   }
 
   if (defined($file)) {
-    $self -> { filter_entry_name } -> set_text("");
-    $self -> { filter_entry_home } -> set_text("");
-    $self -> { filter_entry_mobile } -> set_text("");
-
-    $self -> filter_rows();
-
     open(FILE, ">" . $file) or return $self -> error("Error opening $file: $!");
 
     $self -> { main_model } -> foreach(sub {
