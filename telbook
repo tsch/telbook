@@ -213,30 +213,21 @@ sub create_edit_frame {
 sub create_filter_frame {
   my ($self) = @_;
 
-  my $filter_frame = Gtk3::Frame -> new("Filter");
-  my $filter_vbox = Gtk3::VBox -> new(0, 0);
+  my $filter_hbox = Gtk3::HBox -> new(0, 10);
 
-  $filter_vbox -> set_border_width(5);
-
-  my $filter_entry_hbox = Gtk3::HBox -> new(0, 0);
-  my $filter_button_hbox = Gtk3::HBox -> new(0, 0);
+  my $filter_label = Gtk3::Label -> new('Filter:');
 
   my $filter_entry = Gtk3::Entry -> new();
-
   $filter_entry -> signal_connect(changed => sub {
     return $self -> filter_rows();
   });
 
-  $filter_entry_hbox -> pack_start($filter_entry, 1, 1, 0);
-
-  $filter_vbox -> pack_start($filter_entry_hbox, 1, 1, 0);
-  $filter_vbox -> pack_start($filter_button_hbox, 1, 1, 0);
-
-  $filter_frame -> add($filter_vbox);
+  $filter_hbox -> pack_start($filter_label, 0, 0, 0);
+  $filter_hbox -> pack_start($filter_entry, 1, 1, 0);
 
   $self -> { filter_entry } = $filter_entry;
 
-  return $filter_frame;
+  return $filter_hbox;
 }
 
 sub create_main_list_container {
