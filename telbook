@@ -23,7 +23,7 @@
 
 use strict;
 
-use Gtk2 -init;
+use Gtk2 1.02 -init;
 use Gtk2::Gdk::Keysyms;
 
 ###############################################################################
@@ -111,9 +111,13 @@ sub create_edit_frame {
   my $button_add = Gtk2::Button -> new("_Add");
   my $button_replace = Gtk2::Button -> new("_Replace");
 
-  $edit_entry_name -> set_activates_default(1);
-  $edit_entry_home -> set_activates_default(1);
-  $edit_entry_mobile -> set_activates_default(1);
+  foreach ($edit_entry_name, $edit_entry_home, $edit_entry_mobile) {
+    $_ -> signal_connect(activate => sub {
+      $self -> { main_view } -> get_selection() -> get_selected() ?
+        $button_replace -> clicked() :
+        $button_add -> clicked();
+    });
+  }
 
   $button_add -> signal_connect(clicked => sub {
     my ($name,
@@ -248,7 +252,7 @@ sub create_filter_frame {
 sub create_main_list_container {
   my ($self) = @_;
 
-  my $container = Gtk2::ScrolledWindow -> new(0, 0);
+  my $container = Gtk2::ScrolledWindow -> new();
   my $model = Gtk2::ListStore -> new(qw(Glib::String Glib::String Glib::String));
   my $view = Gtk2::TreeView -> new($model);
 
@@ -279,9 +283,9 @@ sub create_main_list_container {
     my ($model, $iterator) = $selection -> get_selected();
 
     if (defined($model) && defined($iterator)) {
-      $self -> { edit_entry_name } -> set_text($model -> get_value($iterator, COLUMN_NAME));
-      $self -> { edit_entry_home } -> set_text($model -> get_value($iterator, COLUMN_HOME));
-      $self -> { edit_entry_mobile } -> set_text($model -> get_value($iterator, COLUMN_MOBILE));
+      $self -> { edit_entry_name } -> set_text($model -> get($iterator, COLUMN_NAME));
+      $self -> { edit_entry_home } -> set_text($model -> get($iterator, COLUMN_HOME));
+      $self -> { edit_entry_mobile } -> set_text($model -> get($iterator, COLUMN_MOBILE));
     }
     else {
       $self -> { edit_entry_name } -> set_text("");
@@ -403,22 +407,22 @@ sub filter_rows {
       my ($model, $path, $iterator) = @_;
       my ($value_name,
           $value_home,
-          $value_mobile) = ($model -> get_value($iterator, COLUMN_NAME),
-                            $model -> get_value($iterator, COLUMN_HOME),
-                            $model -> get_value($iterator, COLUMN_MOBILE));
+          $value_mobile) = ($model -> get($iterator, COLUMN_NAME),
+                            $model -> get($iterator, COLUMN_HOME),
+                            $model -> get($iterator, COLUMN_MOBILE));
 
       unless (index($value_name, $filter_name) > -1 &&
               index($value_home, $filter_home) > -1 &&
               index($value_mobile, $filter_mobile) > -1) {
         push(@{$self -> { main_model } -> { _hidden }}, [$value_name, $value_home, $value_mobile]);
-        push(@victims, Gtk2::TreeRowReference::new($model, $path));
+        push(@victims, $iterator -> copy());
       }
 
       return 0;
     });
 
     foreach (@victims) {
-      $self -> { main_model } -> remove($self -> { main_model } -> get_iter($_ -> get_path()));
+      $self -> { main_model } -> remove($_);
     }
   }
 
@@ -522,9 +526,9 @@ sub file_save {
     $self -> { main_model } -> foreach(sub {
       my ($model, $path, $iterator) = @_;
 
-      print FILE join("\t", ($model -> get_value($iterator, COLUMN_NAME),
-                             $model -> get_value($iterator, COLUMN_HOME),
-                             $model -> get_value($iterator, COLUMN_MOBILE))), "\n";
+      print FILE join("\t", ($model -> get($iterator, COLUMN_NAME),
+                             $model -> get($iterator, COLUMN_HOME),
+                             $model -> get($iterator, COLUMN_MOBILE))), "\n";
 
       return 0;
     });
