@@ -180,8 +180,14 @@ sub create_main_list_container {
     $cell_renderer -> signal_connect(edited => sub {
       my ($cell_renderer, $path, $new) = @_;
       my $iterator = $model -> get_iter_from_string($path);
-      $self -> changed(1);
-      $model -> set($iterator, $column => $new);
+      my $old = $model -> get($iterator, $column);
+      if ($new ne $old) {
+        $self -> changed(1);
+        $model -> set($iterator, $column => $new);
+        # The sorting might move this row out of view, so scroll there
+        # manually.
+        $view -> set_cursor($model -> get_path($iterator), undef, Glib::FALSE);
+      }
     });
 
     my $view_column =
