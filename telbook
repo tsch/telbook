@@ -68,7 +68,7 @@ sub create_buttons {
 
   my $button_open = Gtk3::Button -> new("_Open");
   my $button_save = Gtk3::Button -> new("_Save");
-  my $button_save_as = Gtk3::Button -> new("Save _As");
+  my $button_save_as = Gtk3::Button -> new("Sa_ve As");
   my $button_quit = Gtk3::Button -> new("_Quit");
 
   $button_open -> signal_connect("clicked", sub {
