@@ -44,15 +44,11 @@ exists it will be read during startup.
                                | Requirements |
                                +--------------+
 
-Telbook is written in Perl and uses the GTK+ 2 perl bindings. See
+Telbook is written in Perl and uses the GTK+ 3 Perl bindings. Specifically, it
+needs:
 
-  http://www.perl.com
-
-and
-
-  http://gtk2-perl.sourceforge.net/
-
-for installation instructions.
+        • perl >= 5.10.0
+        • Gtk3 >= 0.001
 
                                +--------------+
                                | Installation |

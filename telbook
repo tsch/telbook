@@ -24,6 +24,7 @@
 use strict;
 use warnings;
 use utf8;
+use 5.10.0;
 
 use Gtk3 0.001 -init; # FIXME: 0.002
 
@@ -133,6 +134,7 @@ sub create_edit_frame {
   $edit_button_hbox -> pack_start($button_add, 1, 1, 0);
   $edit_button_hbox -> pack_start($button_remove, 1, 1, 0);
 
+  $self -> { edit_button_add } = $button_add;
   $self -> { edit_button_remove } = $button_remove;
 
   return $edit_button_hbox;
@@ -168,7 +170,8 @@ sub create_main_list_container {
                                         Glib::Boolean));
   my $filtered_model = Gtk3::TreeModelFilter -> new($model, undef);
   $filtered_model -> set_visible_column(COLUMN_VISIBLE);
-  my $view = Gtk3::TreeView -> new($filtered_model);
+  my $sorted_model = Gtk3::TreeModelSort -> new_with_model($filtered_model);
+  my $view = Gtk3::TreeView -> new($sorted_model);
 
   foreach ([COLUMN_NAME, "Name", 240],
            [COLUMN_HOME, "Home", 100],
@@ -179,14 +182,18 @@ sub create_main_list_container {
     $cell_renderer -> set(editable => Glib::TRUE);
     $cell_renderer -> signal_connect(edited => sub {
       my ($cell_renderer, $path, $new) = @_;
-      my $iterator = $model -> get_iter_from_string($path);
-      my $old = $model -> get($iterator, $column);
+      my $sorted_iterator = $sorted_model -> get_iter_from_string($path);
+      my $filtered_iterator = $sorted_model -> convert_iter_to_child_iter($sorted_iterator);
+      my $iterator = $filtered_model -> convert_iter_to_child_iter($filtered_iterator);
+      my $old = $model -> get($iterator, $column) // "";
       if ($new ne $old) {
         $self -> changed(1);
         $model -> set($iterator, $column => $new);
         # The sorting might move this row out of view, so scroll there
         # manually.
-        $view -> set_cursor($model -> get_path($iterator), undef, Glib::FALSE);
+        $filtered_iterator = $filtered_model -> convert_child_iter_to_iter($iterator);
+        $sorted_iterator = $sorted_model -> convert_child_iter_to_iter($filtered_iterator);
+        $view -> set_cursor($sorted_model -> get_path($sorted_iterator), undef, Glib::FALSE);
       }
     });
 
@@ -218,7 +225,7 @@ sub create_main_list_container {
   $view -> signal_connect(key_press_event => sub {
     my ($view, $event) = @_;
 
-    # FIXME3: $event->keyval?
+    # FIXME3: $event->keyval
     if ($event -> key -> {keyval} == Gtk3::Gdk::KEY_Delete) {
       my $iterator = $view -> get_selection() -> get_selected();
 
@@ -311,6 +318,7 @@ sub filter_rows {
   my ($self) = @_;
 
   my $filter_text = $self -> { filter_entry } -> get_text();
+  $self -> { edit_button_add } -> set_sensitive ($filter_text eq "");
 
   $self -> { main_model } -> foreach(sub {
     my ($model, $path, $iterator) = @_;
@@ -401,8 +409,8 @@ sub file_open {
         $self -> { main_model } -> set(
           $self -> { main_model } -> append(),
           COLUMN_NAME, $name,
-          COLUMN_HOME, $home || "",
-          COLUMN_MOBILE, $mobile || "",
+          COLUMN_HOME, $home // "",
+          COLUMN_MOBILE, $mobile // "",
           COLUMN_VISIBLE, Glib::TRUE);
       }
     }
