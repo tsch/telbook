@@ -106,25 +106,29 @@ sub create_edit_frame {
   $button_remove -> set_sensitive(Glib::FALSE);
 
   $button_add -> signal_connect(clicked => sub {
-    # FIXME: This doesn't work quite right when a filter is active.
-    my $view = $self -> { main_view };
     my $model = $self -> { main_model };
     my $iterator = $model -> append();
     $model -> set($iterator, COLUMN_VISIBLE, Glib::TRUE);
     $self -> changed(1);
-    $view -> set_cursor($model -> get_path($iterator),
+
+    my $view = $self -> { main_view };
+    my $view_model = $view -> get_model();
+    my $view_iterator = _model_iter_to_view_iter($view, $model, $iterator);
+    $view -> set_cursor($view_model -> get_path($view_iterator),
                         $view -> get_column(COLUMN_NAME),
                         Glib::TRUE);
+
     return 1;
   });
 
   $button_remove -> signal_connect(clicked => sub {
-   my ($model, $iterator) = $self -> { main_view } -> get_selection() -> get_selected();
+   my $view = $self -> { main_view };
+   my ($model, $iterator) = $view -> get_selection() -> get_selected();
 
    if (defined($model) && defined($iterator)) {
-     my $child_model = $model -> get_model();
-     my $child_iterator = $model -> convert_iter_to_child_iter($iterator);
-     $child_model -> remove($child_iterator);
+     my $main_model = $self -> { main_model };
+     my $main_iterator = _view_iter_to_model_iter($view, $main_model, $iterator);
+     $main_model -> remove($main_iterator);
      $self -> changed(1);
    }
 
@@ -162,6 +166,34 @@ sub create_filter_frame {
   return $filter_hbox;
 }
 
+sub _view_iter_to_model_iter {
+  my ($view, $model, $iterator) = @_;
+  my $child_model = $view -> get_model();
+  my $child_iterator = $iterator;
+  while ($child_model != $model) {
+    $child_iterator = $child_model -> convert_iter_to_child_iter($child_iterator);
+    $child_model = $child_model -> get_model();
+  }
+  return $child_iterator;
+}
+
+sub _model_iter_to_view_iter {
+  my ($view, $model, $iterator) = @_;
+
+  my @models_in_between;
+  my $child_model = $view -> get_model();
+  while ($child_model != $model) {
+    push @models_in_between, $child_model;
+    $child_model = $child_model -> get_model();
+  }
+
+  my $parent_iterator = $iterator;
+  foreach my $model_in_between (reverse @models_in_between) {
+    $parent_iterator = $model_in_between -> convert_child_iter_to_iter($parent_iterator);
+  }
+  return $parent_iterator;
+}
+
 sub create_main_list_container {
   my ($self) = @_;
 
@@ -182,18 +214,17 @@ sub create_main_list_container {
     $cell_renderer -> set(editable => Glib::TRUE);
     $cell_renderer -> signal_connect(edited => sub {
       my ($cell_renderer, $path, $new) = @_;
-      my $sorted_iterator = $sorted_model -> get_iter_from_string($path);
-      my $filtered_iterator = $sorted_model -> convert_iter_to_child_iter($sorted_iterator);
-      my $iterator = $filtered_model -> convert_iter_to_child_iter($filtered_iterator);
+      my $view_model = $view -> get_model();
+      my $view_iterator = $view_model -> get_iter_from_string($path);
+      my $iterator = _view_iter_to_model_iter($view, $model, $view_iterator);
       my $old = $model -> get($iterator, $column) // "";
       if ($new ne $old) {
         $self -> changed(1);
         $model -> set($iterator, $column => $new);
         # The sorting might move this row out of view, so scroll there
         # manually.
-        $filtered_iterator = $filtered_model -> convert_child_iter_to_iter($iterator);
-        $sorted_iterator = $sorted_model -> convert_child_iter_to_iter($filtered_iterator);
-        $view -> set_cursor($sorted_model -> get_path($sorted_iterator), undef, Glib::FALSE);
+        my $view_iterator = _model_iter_to_view_iter($view, $model, $iterator);
+        $view -> set_cursor($view_model -> get_path($view_iterator), undef, Glib::FALSE);
       }
     });
 
@@ -230,8 +261,7 @@ sub create_main_list_container {
       my $iterator = $view -> get_selection() -> get_selected();
 
       if (defined($iterator)) {
-        my $child_iterator =
-          $filtered_model -> convert_iter_to_child_iter($iterator);
+        my $child_iterator = _view_iter_to_model_iter($view, $model, $iterator);
         $model -> remove($child_iterator);
         $self -> changed(1);
       }
