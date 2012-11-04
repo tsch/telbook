@@ -3,7 +3,7 @@
 ###############################################################################
 #                                                                             #
 # Telbook - A simple telephone book                                           #
-# Copyright (C) 2003 Torsten Schönfeld                                        #
+# Copyright (C) 2003-2012 Torsten Schönfeld                                   #
 #                                                                             #
 # This program is free software; you can redistribute it and/or modify it     #
 # under the terms of the GNU General Public License as published by the Free  #
@@ -26,7 +26,7 @@ use warnings;
 use utf8;
 use 5.10.0;
 
-use Gtk3 0.002 -init;
+use Gtk3 0.008 -init;
 
 ###############################################################################
 
@@ -256,8 +256,7 @@ sub create_main_list_container {
   $view -> signal_connect(key_press_event => sub {
     my ($view, $event) = @_;
 
-    # FIXME3: $event->keyval
-    if ($event -> key -> {keyval} == Gtk3::Gdk::KEY_Delete) {
+    if ($event -> keyval == Gtk3::Gdk::KEY_Delete) {
       my $iterator = $view -> get_selection() -> get_selected();
 
       if (defined($iterator)) {

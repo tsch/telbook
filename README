@@ -48,7 +48,7 @@ Telbook is written in Perl and uses the GTK+ 3 Perl bindings. Specifically, it
 needs:
 
         • perl >= 5.10.0
-        • Gtk3 >= 0.002
+        • perl-Gtk3 >= 0.008
 
                                +--------------+
                                | Installation |
