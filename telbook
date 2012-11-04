@@ -463,9 +463,10 @@ sub file_save {
     $self -> { main_model } -> foreach(sub {
       my ($model, $path, $iterator) = @_;
 
-      print FILE join("\t", ($model -> get($iterator, COLUMN_NAME),
-                             $model -> get($iterator, COLUMN_HOME),
-                             $model -> get($iterator, COLUMN_MOBILE))), "\n";
+      my $line = join("\t", ($model -> get($iterator, COLUMN_NAME),
+                             $model -> get($iterator, COLUMN_HOME) // "",
+                             $model -> get($iterator, COLUMN_MOBILE) // ""));
+      print FILE $line, "\n";
 
       return 0;
     });
