@@ -505,7 +505,7 @@ sub question {
   my $response = $dialog -> run();
   $dialog -> destroy();
 
-  # FIXME3: return $response eq "yes" ? 1 : 0;
+  # FIXME3: $response eq "yes"
   return $response == -8 ? 1 : 0;
 }
 
@@ -513,12 +513,35 @@ sub quit {
   my ($self) = @_;
 
   if ($self -> changed() == 1) {
-    if ($self -> question("Really quit and abandon all changes?")) {
+    my $dialog = Gtk3::MessageDialog -> new($self -> { main_window },
+                                            "modal",
+                                            "question",
+                                            "none",
+                                            "Save changes before exiting?");
+
+    $dialog -> add_buttons("_Exit without Saving" => 0,
+                           "gtk-cancel" => 1,
+                           "gtk-save" => 2);
+
+    my $response = $dialog -> run();
+    $dialog -> destroy();
+
+    # FIXME3: $response eq "delete-event"
+    if ($response == -4 || $response == 1) {
+      return;
+    }
+    elsif ($response == 0) {
       Gtk3 -> main_quit();
+      return 1;
+    }
+    elsif ($response == 2) {
+      $self -> file_save() && Gtk3 -> main_quit();
+      return 1;
     }
   }
   else {
     Gtk3 -> main_quit();
+    return 1;
   }
 
   return 1;
