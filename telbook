@@ -124,6 +124,9 @@ sub create_menu {
       <separator/>
       <menuitem action="quit"/>
     </menu>
+    <menu action="help">
+      <menuitem action="about"/>
+    </menu>
   </menubar>
 </ui>
 __UI__
@@ -152,6 +155,16 @@ __UI__
       name     => 'quit',
       stock_id => 'gtk-quit',
       callback => sub { $self -> quit(); },
+    },
+    {
+      name     => 'help',
+      stock_id => 'gtk-help',
+    },
+    {
+      name => 'about',
+      stock_id => 'gtk-about',
+      accelerator => 'F4',
+      callback => sub { $self -> about(); },
     },
   );
 
@@ -553,6 +566,22 @@ sub quit {
 
   return 1;
 }
+
+sub about {
+  my ($self) = @_;
+  Gtk3 -> show_about_dialog(
+    $self -> { main_window },
+    program_name   => 'Telbook',
+    version        => '0.4',
+    logo_icon_name => 'vcard',
+    authors        => 'Torsten Schönfeld',
+    documenters    => 'Torsten Schönfeld',
+    comments       => 'A simple personal telephone book',
+    copyright      => "Copyright (C) 2003-2014 Torsten Schönfeld",
+    license_type   => 'gpl-2-0',
+  );
+}
+
 
 sub run {
   my ($self) = @_;
