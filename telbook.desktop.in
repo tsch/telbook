@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Telbook
+Comment=Sipmle personal telephone book
+Exec=%PREFIX%/bin/telbook
+Categories=GNOME;GTK;Office;ContactManagement;
+Icon=vcard
+Terminal=false
