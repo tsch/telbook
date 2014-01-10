@@ -375,33 +375,20 @@ sub file_dialog {
   my ($self, $action) = @_;
   my $file;
 
-  my $file_selector = Gtk3::FileSelection -> new(
-    ($action eq "save") ?
+  my $file_chooser = Gtk3::FileChooserDialog -> new(
+    (($action eq "save") ?
       "Select a file for saving" :
-      "Select the file to open");
+      "Select the file to open"),
+    $self -> { main_window },
+   $action,
+   "Cancel" => "cancel",
+   "OK" => "ok");
 
-  $file_selector -> signal_connect(delete_event => sub {
-    Gtk3 -> main_quit();
-    return 1;
-  });
-
-  $file_selector -> ok_button -> signal_connect(clicked => sub {
-    $file = $file_selector -> get_filename();
-    Gtk3 -> main_quit();
-    return 1;
-  });
-
-  $file_selector -> cancel_button -> signal_connect(clicked => sub {
-    Gtk3 -> main_quit();
-    return 1;
-  });
-
-  $file_selector -> set_modal(1);
-  $file_selector -> set_transient_for($self -> { main_window });
-  $file_selector -> show_all();
-
-  Gtk3 -> main();
-  $file_selector -> destroy();
+  my $response = $file_chooser -> run();
+  if ($response eq "ok") {
+    $file = $file_chooser -> get_filename();
+  }
+  $file_chooser -> destroy();
 
   return $file;
 }
@@ -505,8 +492,7 @@ sub question {
   my $response = $dialog -> run();
   $dialog -> destroy();
 
-  # FIXME3: $response eq "yes"
-  return $response == -8 ? 1 : 0;
+  return $response eq "yes";
 }
 
 sub quit {
@@ -526,8 +512,7 @@ sub quit {
     my $response = $dialog -> run();
     $dialog -> destroy();
 
-    # FIXME3: $response eq "delete-event"
-    if ($response == -4 || $response == 1) {
+    if ($response eq "delete-event" || $response == 1) {
       return;
     }
     elsif ($response == 0) {
