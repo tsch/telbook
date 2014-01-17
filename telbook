@@ -609,8 +609,26 @@ my $ui = ui -> new();
 
 $ui -> initialize();
 
-if (-f $ENV{ HOME } . "/.telbook") {
-  $ui -> file_open($ENV{ HOME } . "/.telbook");
+my $HOME_DIR = $ENV{ HOME };
+my $DATA_DIR = $HOME_DIR . "/.local/share/telbook";
+my $DEFAULT_TELBOOK = $DATA_DIR . "/telbook";
+
+my $OLD_DEFAULT_TELBOOK = $HOME_DIR . "/.telbook";
+
+if (-f $OLD_DEFAULT_TELBOOK) {
+  if (not -f $DEFAULT_TELBOOK) {
+    warn sprintf "*** Moving old default telbook at '%s' to new location '%s'\n",
+                 $OLD_DEFAULT_TELBOOK, $DEFAULT_TELBOOK;
+    rename $OLD_DEFAULT_TELBOOK, $DEFAULT_TELBOOK;
+  } else {
+    warn sprintf "*** Both, the old default telbook at '%s' " .
+                 "and the new default telbook at '%s' exist; ignoring the old one\n",
+                 $OLD_DEFAULT_TELBOOK, $DEFAULT_TELBOOK
+  }
+}
+
+if (-f $DEFAULT_TELBOOK) {
+  $ui -> file_open($DEFAULT_TELBOOK);
 }
 
 $ui -> run();
